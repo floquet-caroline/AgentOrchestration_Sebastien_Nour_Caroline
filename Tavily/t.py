@@ -10,84 +10,6 @@ from autogen_agentchat.conditions import MaxMessageTermination
 
 DB_PATH = "Tavily/conversations.db"
 
-#--------------------------------------------------------------
-# BASE DE DONNÉES
-def init_db():
-    """Initialise la base SQLite et crée les tables si elles n'existent pas."""
-    con = sqlite3.connect(DB_PATH)
-    cur = con.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            topic TEXT NOT NULL,
-            tutorial_content TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        )
-    """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id INTEGER NOT NULL,
-            role TEXT NOT NULL,
-            content TEXT NOT NULL,
-            timestamp TEXT NOT NULL,
-            FOREIGN KEY (session_id) REFERENCES sessions(id)
-        )
-    """)
-    con.commit()
-    con.close()
-
-def create_session(topic: str, tutorial_content: str) -> int:
-    """Crée une nouvelle session et retourne son id."""
-    con = sqlite3.connect(DB_PATH)
-    cur = con.cursor()
-    cur.execute(
-        "INSERT INTO sessions (topic, tutorial_content, created_at) VALUES (?, ?, ?)",
-        (topic, tutorial_content, datetime.datetime.now().isoformat())
-    )
-    session_id = cur.lastrowid
-    con.commit()
-    con.close()
-    return session_id
-
-def save_message(session_id: int, role: str, content: str):
-    """Enregistre un message (question ou réponse) dans la session."""
-    con = sqlite3.connect(DB_PATH)
-    cur = con.cursor()
-    cur.execute(
-        "INSERT INTO messages (session_id, role, content, timestamp) VALUES (?, ?, ?, ?)",
-        (session_id, role, content, datetime.datetime.now().isoformat())
-    )
-    con.commit()
-    con.close()
-
-def load_session(session_id: int) -> dict:
-    """Charge une session existante avec son historique de messages."""
-    con = sqlite3.connect(DB_PATH)
-    cur = con.cursor()
-    cur.execute("SELECT topic, tutorial_content, created_at FROM sessions WHERE id = ?", (session_id,))
-    row = cur.fetchone()
-    if not row:
-        con.close()
-        return None
-    topic, tutorial_content, created_at = row
-    cur.execute(
-        "SELECT role, content, timestamp FROM messages WHERE session_id = ? ORDER BY id",
-        (session_id,)
-    )
-    messages = [{"role": r, "content": c, "timestamp": t} for r, c, t in cur.fetchall()]
-    con.close()
-    return {"id": session_id, "topic": topic, "tutorial_content": tutorial_content,
-            "created_at": created_at, "messages": messages}
-
-def list_sessions() -> list:
-    """Retourne toutes les sessions enregistrées."""
-    con = sqlite3.connect(DB_PATH)
-    cur = con.cursor()
-    cur.execute("SELECT id, topic, created_at FROM sessions ORDER BY id DESC")
-    rows = [{"id": r[0], "topic": r[1], "created_at": r[2]} for r in cur.fetchall()]
-    con.close()
-    return rows
 
 model_client_large = OpenAIChatCompletionClient(
         model="llama-3.3-70b-versatile",
@@ -204,18 +126,13 @@ team = RoundRobinGroupChat(
 )
 
 
-async def interactive_qa(tutorial_content: str, session_id: int, history: list = None):
+async def interactive_qa(tutorial_content: str):
     """Phase interactive : l'utilisateur pose des questions, le Professeur répond."""
     context = tutorial_content[:3000] + "..." if len(tutorial_content) > 3000 else tutorial_content
 
     # Injecte l'historique passé dans le system message si reprise de session
     history_text = ""
-    if history:
-        lines = []
-        for msg in history:
-            prefix = "Étudiant" if msg["role"] == "user" else "Professeur"
-            lines.append(f"**{prefix} [{msg['timestamp'][:10]}]** : {msg['content']}")
-        history_text = "\n\n--- HISTORIQUE DE LA SESSION PRÉCÉDENTE ---\n" + "\n\n".join(lines) + "\n--- FIN DE L'HISTORIQUE ---"
+
 
     professor = AssistantAgent(
         name="Professor",
@@ -247,8 +164,6 @@ async def interactive_qa(tutorial_content: str, session_id: int, history: list =
             print("Fin de la session. Bonne continuation !")
             break
 
-        save_message(session_id, "user", question)
-
         qa_team = RoundRobinGroupChat([professor], termination_condition=qa_termination)
         result = await qa_team.run(task=question)
 
@@ -256,37 +171,10 @@ async def interactive_qa(tutorial_content: str, session_id: int, history: list =
             if getattr(msg, "source", "") == "Professor":
                 answer = msg.content
                 print(f"\nProfesseur :\n{answer}\n")
-                save_message(session_id, "professor", answer)
                 break
 
 
 async def main():
-    init_db()
-
-    # --- Reprise ou nouvelle session ---
-    sessions = list_sessions()
-    session_id = None
-    tutorial_content = None
-    history = []
-
-    if sessions:
-        print("\n=== Sessions existantes ===")
-        for s in sessions:
-            print(f"  [{s['id']}] {s['topic'][:80]} — {s['created_at'][:10]}")
-        choice = input("\nReprise d'une session (entre l'id) ou nouvelle session (appuie sur Entrée) : ").strip()
-        if choice.isdigit():
-            data = load_session(int(choice))
-            if data:
-                session_id = data["id"]
-                tutorial_content = data["tutorial_content"]
-                history = data["messages"]
-                print(f"\n=> Session '{data['topic'][:60]}' reprise ({len(history)} messages précédents).")
-                print("=> Tutoriel rechargé depuis la base de données.")
-                await interactive_qa(tutorial_content, session_id, history)
-                return
-            else:
-                print("Session introuvable, démarrage d'une nouvelle session.")
-
     # --- Nouvelle session : génération du tutoriel ---
     task = "Explique ce qu'est un RAG, et a quoi il sert, hésite pas a aller dans les détails sans prendre d'exemple tres spécifique"
 
@@ -311,10 +199,7 @@ async def main():
             f.write(writer_message)
         print("\n=> Tutoriel sauvegardé dans Tavily/tutorial_output.md")
 
-        session_id = create_session(task, writer_message)
-        print(f"=> Session #{session_id} sauvegardée dans la base de données.")
-
-        await interactive_qa(writer_message, session_id)
+        await interactive_qa(writer_message)
     else:
         print("Aucune réponse du Writer trouvée.")
 
