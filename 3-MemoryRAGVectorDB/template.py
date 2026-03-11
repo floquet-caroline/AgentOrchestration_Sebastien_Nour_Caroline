@@ -55,8 +55,8 @@ def populate(template) :
     )
     return custom_system_message
 
-def use(template) :
-    p = str(input("Write a short prompt here : \n"))
+def use(template, my_prompt) :
+    p = my_prompt
     c = llm_config()
     a = init_agent(c,populate(template))
     prompt(a,p)

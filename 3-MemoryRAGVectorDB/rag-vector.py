@@ -1,0 +1,52 @@
+#Embedding : transform the text into numerical vectors that hold semantic distance
+#Vector DB : store the vectors and compare them
+
+from template import AGENT_ROLE_TEMPLATE, use, populate, prompt, init_agent, llm_config
+
+DOC1 = '''
+Cool documentation page 1
+Greeting function
+Greets another user with a message like so :
+greetings(name1, name2, message) => "<name1> says : "Hi <name2> ! <message>"
+'''
+
+DOC2 = '''
+Cool documentation page 2
+Anything function
+Gives a random generated message about a different subject every time you use it.
+Useful to get random text to test your formatting or research algorithms.
+anything() => <random_message>
+'''
+
+PROMPT = str(input("Write a short prompt here : \n"))
+
+# Add docs and query db
+import chromadb
+
+# 1. Initialize the Chroma client
+# Use PersistentClient to save data to a local folder
+client = chromadb.PersistentClient(path="./test-rag")
+
+# 2. Create or get a collection
+# A collection is like a table in a database
+collection = client.get_or_create_collection(name="test-docs")
+
+# 3. Add text to the collection
+# Chroma automatically generates embeddings if you don't provide them
+collection.add(
+    documents=[DOC1, DOC2],
+    metadatas=[{"source": "cool-documentation"}, {"source": "cool-documentation"}],
+    ids=["id1", "id2"]
+)
+
+# 4. Query the collection
+results = collection.query(
+    query_texts=[PROMPT],
+    n_results=1
+)
+
+use(AGENT_ROLE_TEMPLATE,results)
+
+# cut in chunks if can take big docs
+
+
