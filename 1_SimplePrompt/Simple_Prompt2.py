@@ -9,7 +9,7 @@ async def main():
     # On utilise OpenAIChatCompletionClient car Groq utilise le même format d'API
     model_client = OpenAIChatCompletionClient(
         model="llama-3.3-70b-versatile",
-        api_key="OUAIS TKT", # Remplacez par votre clé
+        api_key="", # Remplacez par votre clé
         base_url="https://api.groq.com/openai/v1", # Indispensable pour Groq
         model_info={
         "vision": False,       # Le modèle supporte-t-1 l'image ?
