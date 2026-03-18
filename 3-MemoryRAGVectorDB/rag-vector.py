@@ -45,6 +45,22 @@ results = collection.query(
     n_results=1
 )
 
+# parse results into a list of dicts to use in the agent
+def parse(results):
+    parsed_results = []
+    
+    # results['documents'][0] and results['metadatas'][0] are lists
+    for doc, meta in zip(results['documents'][0], results['metadatas'][0]):
+        # Construct the dictionary with the mandatory 'type' key
+        element = {
+            "type": "text",  # This is the key your error is looking for
+            "text": f"Source: {meta.get('source', 'Unknown')} \nContent: {doc}"
+        }
+        parsed_results.append(element)
+        
+    return parsed_results
+
+results = parse(results)
 use(AGENT_ROLE_TEMPLATE,results)
 
 # cut in chunks if can take big docs
