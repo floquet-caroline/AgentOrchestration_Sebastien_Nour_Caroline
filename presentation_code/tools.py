@@ -19,8 +19,10 @@ def get_embedding_model():
 
 
 class VectorDB:
-    def __init__(self):
+    def __init__(self, reset: bool = False):
         self.client = chromadb.PersistentClient(path="./chroma_db")
+        if reset:
+            self.client.delete_collection(name="tutoriels")
         self.collection = self.client.get_or_create_collection(name="tutoriels")
 
     def index_segments(self, text_content: str) -> str:
