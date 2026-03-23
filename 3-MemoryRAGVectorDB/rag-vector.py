@@ -3,6 +3,7 @@
 
 from template import AGENT_ROLE_TEMPLATE, use, populate, prompt, init_agent, llm_config
 
+# ---STRING DOCUMENTS---
 DOC1 = '''
 Cool documentation page 1
 Greeting function
@@ -18,20 +19,21 @@ Useful to get random text to test your formatting or research algorithms.
 anything() => <random_message>
 '''
 
+# ---PROMPT---
 PROMPT = str(input("Write a short prompt here : \n"))
 
 # Add docs and query db
 import chromadb
 
-# 1. Initialize the Chroma client
+# ---CHROMA CLIENT---
 # Use PersistentClient to save data to a local folder
 client = chromadb.PersistentClient(path="./test-rag")
 
-# 2. Create or get a collection
+# ---CREATE COLLECTION AND ADD DOCUMENTS---
 # A collection is like a table in a database
 collection = client.get_or_create_collection(name="test-docs")
 
-# 3. Add text to the collection
+# Add text to the collection
 # Chroma automatically generates embeddings if you don't provide them
 collection.add(
     documents=[DOC1, DOC2],
@@ -39,12 +41,13 @@ collection.add(
     ids=["id1", "id2"]
 )
 
-# 4. Query the collection
+# ---QUERY DATABASE---
 results = collection.query(
     query_texts=[PROMPT],
     n_results=1
 )
 
+# ---PARSE RESULTS---
 # parse results into a list of dicts to use in the agent
 def parse(results):
     parsed_results = []
@@ -64,6 +67,5 @@ def parse(results):
 results = parse(results)
 use(AGENT_ROLE_TEMPLATE,results)
 
-# cut in chunks if can take big docs
 
 
