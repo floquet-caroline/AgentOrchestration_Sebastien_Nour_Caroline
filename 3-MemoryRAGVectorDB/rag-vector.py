@@ -63,9 +63,9 @@ def parse(results):
         
     return parsed_results
 
-#print(results)
-results = parse(results)
-use(AGENT_ROLE_TEMPLATE,results)
+print(results)
+#results = parse(results)
+#use(AGENT_ROLE_TEMPLATE,results)
 
 
 
