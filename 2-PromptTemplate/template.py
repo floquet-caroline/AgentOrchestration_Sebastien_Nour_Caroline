@@ -63,3 +63,5 @@ def use(template) :
     c = llm_config()
     a = init_agent(c,populate(template))
     prompt(a,p)
+
+use(AGENT_ROLE_TEMPLATE)
